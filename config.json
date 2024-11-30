@@ -1,0 +1,12 @@
+{
+    "locations": {
+        "exit.zachl.tech": {
+            "port": 24,
+            "hostname": "192.168.86.140"
+        },
+        "zachl.tech": {
+            "port": 25,
+            "hostname": "192.168.86.140"
+        }
+    }
+}

@@ -1,18 +1,31 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"log"
+	"net"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/charmbracelet/log"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/ssh"
+	"github.com/charmbracelet/wish"
+	"github.com/charmbracelet/wish/activeterm"
+	"github.com/charmbracelet/wish/bubbletea"
+	"github.com/charmbracelet/wish/logging"
 )
 
 type Location struct {
-	Port     int    `json:"port"`
-	Hostname string `json:"hostname"`
+	Servicename string `json:"service"`
+	Hostname    string `json:"hostname"`
+	Port        int    `json:"port"`
 }
 
 type Config struct {
@@ -24,6 +37,75 @@ type Model struct {
 	config      Config
 	err         error
 	destination string
+}
+
+const responseTime = 5000 * time.Millisecond // The amount of milliseconds for the result to be displayed
+
+type tickMsg time.Time
+
+func tickResponse() tea.Cmd {
+	return tea.Tick(responseTime, func(t time.Time) tea.Msg {
+		return tickMsg(t)
+	})
+}
+
+func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
+	m := initialModel()
+	return m, []tea.ProgramOption{tea.WithInput(os.Stdin)}
+}
+
+func RunSSHServer() {
+	// err := godotenv.Load()
+	// if err != nil {
+	// 	fmt.Printf("Error running program - In Loading .env to run SSH Game: %v", err)
+	// 	os.Exit(1)
+	// }
+
+	var (
+		host = "0.0.0.0"
+		port = "23"
+	)
+
+	s, err := wish.NewServer(
+		wish.WithAddress(net.JoinHostPort(host, port)),
+
+		wish.WithMiddleware(
+			bubbletea.Middleware(teaHandler),
+			activeterm.Middleware(),
+			logging.Middleware(),
+		),
+	)
+	if err != nil {
+		log.Error("Could not start server", "error", err)
+	}
+
+	done := make(chan os.Signal, 1)
+	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	log.Info("Starting SSH server", "host", host, "port", port)
+	go func() {
+		if err = s.ListenAndServe(); err != nil && !errors.Is(err, ssh.ErrServerClosed) {
+			log.Error("Could not start server", "error", err)
+			done <- nil
+		}
+	}()
+
+	<-done
+	log.Info("Stopping SSH server")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer func() { cancel() }()
+	if err := s.Shutdown(ctx); err != nil && !errors.Is(err, ssh.ErrServerClosed) {
+		log.Error("Could not stop server", "error", err)
+	}
+}
+
+func RunLocalTUI() {
+	initialModel := initialModel()
+
+	p := tea.NewProgram(initialModel)
+	if _, err := p.Run(); err != nil {
+		fmt.Printf("Error running program: %v", err)
+		os.Exit(1)
+	}
 }
 
 func loadConfig(filename string) (Config, error) {
@@ -43,7 +125,7 @@ func loadConfig(filename string) (Config, error) {
 func initialModel() Model {
 	config, err := loadConfig("config.json")
 	ti := textinput.New()
-	ti.Placeholder = "Enter full domain (e.g., exit.zachl.tech)"
+	ti.Placeholder = "Enter where you're trying to go (e.g., exit.zachl.tech, zachl.tech)"
 	ti.Focus()
 	return Model{
 		textInput: ti,
@@ -51,6 +133,7 @@ func initialModel() Model {
 		err:       err,
 	}
 }
+
 func (m Model) Init() tea.Cmd {
 	return nil
 }
@@ -58,6 +141,9 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
+	case tickMsg:
+		m.textInput.Placeholder = "Enter where you're trying to go (e.g., exit.zachl.tech, zachl.tech)"
+
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyEsc:
@@ -65,12 +151,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyEnter:
 			m.destination = m.textInput.Value()
 			if location, exists := m.config.Locations[m.destination]; exists {
-				m.textInput.Placeholder = fmt.Sprintf("Routing to %s on port %d (hostname: %s)\n", m.destination, location.Port, location.Hostname)
+				m.textInput.Placeholder = fmt.Sprintf("Run this command to access %v: ssh -p %v %v\n", location.Servicename, location.Port, location.Hostname)
 				m.textInput.SetValue("")
-				return m, tea.Quit
+				return m, tickResponse()
 			} else {
 				m.textInput.Placeholder = fmt.Sprintf("no destination found at location: %s", m.destination)
 				m.textInput.SetValue("")
+				return m, tickResponse()
 			}
 		}
 	}
@@ -80,14 +167,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) View() string {
 	if m.err != nil {
-		return fmt.Sprintf("Error: %v\n\n%s\n\n(esc to quit)", m.err, m.textInput.View())
+		return fmt.Sprintf("Error: %v\n\n%s\n\n(esc to quit)\n\n", m.err, m.textInput.View())
 	}
-	return fmt.Sprintf("MAKE THIS TITLE CUSTOMIZABLE WITH CONFIG!\n\nWhere are you connecting? Enter the full domain (including subdomains if applicable):\n\n%s\n\n(esc to quit)", m.textInput.View())
+	return fmt.Sprintf("\n\nGreetings, traveler! You've reached ZachLTech's SSH Lobby.\n\nFor help on where to navigate, enter the full domain of the SSH location you're trying to access (including subdomains if applicable):\n\n%s\n\n(esc to quit)", m.textInput.View())
 }
 
 func main() {
-	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
-		log.Fatalf("Error running program: %v", err)
-	}
+	RunSSHServer()
 }

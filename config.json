@@ -1,12 +1,14 @@
 {
     "locations": {
         "exit.zachl.tech": {
+            "service": "eXit TUI Game",
             "port": 24,
-            "hostname": "192.168.86.140"
+            "hostname": "exit.zachl.tech"
         },
         "zachl.tech": {
+            "service": "ZachLTech's SSHfolio",
             "port": 25,
-            "hostname": "192.168.86.140"
+            "hostname": "zachl.tech"
         }
     }
 }

@@ -5,3 +5,4 @@ TODO:
 
 - organize code
 - setup ssh server config and custom title with config.json as opposed to .env this time
+- implement "help" command

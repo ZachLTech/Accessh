@@ -28,7 +28,20 @@ type Location struct {
 	Port        int    `json:"port"`
 }
 
+type SSHSettings struct {
+	Enabled  bool   `json:"enabled"`
+	Hostname string `json:"hostname"`
+	Port     string `json:"port"`
+}
+
+type ProgramSettings struct {
+	Title       string      `json:"title"`
+	Description string      `json:"description"`
+	SSHSettings SSHSettings `json:"SSH"`
+}
+
 type Config struct {
+	Settings  ProgramSettings     `json:"settings"`
 	Locations map[string]Location `json:"locations"`
 }
 
@@ -54,16 +67,10 @@ func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 	return m, []tea.ProgramOption{tea.WithInput(os.Stdin)}
 }
 
-func RunSSHServer() {
-	// err := godotenv.Load()
-	// if err != nil {
-	// 	fmt.Printf("Error running program - In Loading .env to run SSH Game: %v", err)
-	// 	os.Exit(1)
-	// }
-
+func RunSSHServer(config Config) {
 	var (
-		host = "0.0.0.0"
-		port = "23"
+		host = config.Settings.SSHSettings.Hostname
+		port = config.Settings.SSHSettings.Port
 	)
 
 	s, err := wish.NewServer(
@@ -169,9 +176,18 @@ func (m Model) View() string {
 	if m.err != nil {
 		return fmt.Sprintf("Error: %v\n\n%s\n\n(esc to quit)\n\n", m.err, m.textInput.View())
 	}
-	return fmt.Sprintf("\n\nGreetings, traveler! You've reached ZachLTech's SSH Lobby.\n\nFor help on where to navigate, enter the full domain of the SSH location you're trying to access (including subdomains if applicable):\n\n%s\n\n(esc to quit)", m.textInput.View())
+	return fmt.Sprintf("\n\n%v\n\n%v:\n\n%s\n\n(esc to quit)", m.config.Settings.Title, m.config.Settings.Description, m.textInput.View())
 }
 
 func main() {
-	RunSSHServer()
+	config, err := loadConfig("config.json")
+	if err != nil {
+		log.Error("Could not load config", "error", err)
+	}
+
+	if config.Settings.SSHSettings.Enabled {
+		RunSSHServer(config)
+	} else {
+		RunLocalTUI()
+	}
 }

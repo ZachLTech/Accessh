@@ -1,4 +1,13 @@
 {
+    "settings": {
+        "title": "Greetings, traveler! You've reached ZachLTech's SSH Lobby.",
+        "description": "For help on where to navigate, enter the full domain of the SSH location you're trying to access (including subdomains if applicable)",
+        "SSH": {
+            "enabled": true,
+            "hostname": "0.0.0.0",
+            "port": "23"
+        }
+    },
     "locations": {
         "exit.zachl.tech": {
             "service": "eXit TUI Game",

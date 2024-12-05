@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  accessh:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./:/app
+    ports:
+        - "23:23"
+    container_name: accessh
+    restart: unless-stopped
+    command: go run .
+

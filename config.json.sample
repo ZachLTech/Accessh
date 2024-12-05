@@ -1,0 +1,27 @@
+{
+    "settings": {
+        "title": "You've reached my SSH Lobby... But you seem to be lost",
+        "description": "For help on where to navigate, enter the full domain of the SSH location you're trying to access (type \"help\" for a list of public destinations)",
+        "SSH": {
+            "enabled": false,
+            "hostname": "0.0.0.0",
+            "port": "23"
+        }
+    },
+    "locations": {
+        "example.com": {
+            "service": "Example SSH Service",
+            "description": "My SSH Service for example purposes",
+            "repo": "github.com/Sample/Sample",
+            "port": 25,
+            "hostname": "example.com"
+        },
+        "sample.example.com": {
+            "service": "Example SSH Service 2",
+            "description": "My other SSH Service for example purposes",
+            "repo": "github.com/Sample/Sample2",
+            "port": 24,
+            "hostname": "sample.example.com"
+        }
+    }
+}

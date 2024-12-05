@@ -1,4 +1,4 @@
-module Proxy22
+module Accessh
 
 go 1.22.5
 

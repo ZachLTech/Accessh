@@ -11,11 +11,15 @@
     "locations": {
         "exit.zachl.tech": {
             "service": "eXit TUI Game",
+            "description": "",
+            "repo": "",
             "port": 24,
             "hostname": "exit.zachl.tech"
         },
         "zachl.tech": {
             "service": "ZachLTech's SSHfolio",
+            "description": "",
+            "repo": "",
             "port": 25,
             "hostname": "zachl.tech"
         }

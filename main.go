@@ -50,6 +50,7 @@ type Model struct {
 	config      Config
 	err         error
 	destination string
+	showHelp    bool
 }
 
 const responseTime = 5000 * time.Millisecond // The amount of milliseconds for the result to be displayed
@@ -172,10 +173,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+func getLocations(locations map[string]Location) string {
+
+	for _, location := range locations {
+
+	}
+
+}
+
 func (m Model) View() string {
 	if m.err != nil {
 		return fmt.Sprintf("Error: %v\n\n%s\n\n(esc to quit)\n\n", m.err, m.textInput.View())
 	}
+
+	if m.showHelp {
+		return getLocations(m.config.Locations)
+	}
+
 	return fmt.Sprintf("\n\n%v\n\n%v:\n\n%s\n\n(esc to quit)", m.config.Settings.Title, m.config.Settings.Description, m.textInput.View())
 }
 

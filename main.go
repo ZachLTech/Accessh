@@ -8,22 +8,29 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/charmbracelet/log"
+	"golang.org/x/term"
 
 	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	"github.com/charmbracelet/wish/activeterm"
 	"github.com/charmbracelet/wish/bubbletea"
 	"github.com/charmbracelet/wish/logging"
+	"github.com/muesli/reflow/wordwrap"
 )
 
 type Location struct {
 	Servicename string `json:"service"`
+	Description string `json:"description"`
+	Repository  string `json:"repo"`
 	Hostname    string `json:"hostname"`
 	Port        int    `json:"port"`
 }
@@ -46,11 +53,14 @@ type Config struct {
 }
 
 type Model struct {
-	textInput   textinput.Model
-	config      Config
-	err         error
-	destination string
-	showHelp    bool
+	textInput     textinput.Model
+	locationCards string
+	config        Config
+	err           error
+	destination   string
+	showHelp      bool
+	width         int
+	viewport      viewport.Model
 }
 
 const responseTime = 5000 * time.Millisecond // The amount of milliseconds for the result to be displayed
@@ -65,7 +75,7 @@ func tickResponse() tea.Cmd {
 
 func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
 	m := initialModel()
-	return m, []tea.ProgramOption{tea.WithInput(os.Stdin)}
+	return m, []tea.ProgramOption{tea.WithInput(os.Stdin), tea.WithAltScreen()}
 }
 
 func RunSSHServer(config Config) {
@@ -109,7 +119,7 @@ func RunSSHServer(config Config) {
 func RunLocalTUI() {
 	initialModel := initialModel()
 
-	p := tea.NewProgram(initialModel)
+	p := tea.NewProgram(initialModel, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error running program: %v", err)
 		os.Exit(1)
@@ -132,13 +142,21 @@ func loadConfig(filename string) (Config, error) {
 
 func initialModel() Model {
 	config, err := loadConfig("config.json")
-	ti := textinput.New()
-	ti.Placeholder = "Enter where you're trying to go (e.g., exit.zachl.tech, zachl.tech)"
-	ti.Focus()
+	width, height, _ := term.GetSize(0)
+	textInput := textinput.New()
+	textInput.Placeholder = "Enter where you're trying to go (e.g., exit.zachl.tech, zachl.tech)"
+	textInput.Focus()
+
+	viewport := viewport.New(width, height-6) // Leave space for header/footer
+	viewport.SetContent("Loading...")
+
 	return Model{
-		textInput: ti,
-		config:    config,
-		err:       err,
+		textInput:     textInput,
+		locationCards: getLocations(config.Locations),
+		config:        config,
+		err:           err,
+		width:         width,
+		viewport:      viewport,
 	}
 }
 
@@ -147,17 +165,40 @@ func (m Model) Init() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
+	var (
+		cmd  tea.Cmd
+		cmds []tea.Cmd
+	)
+
 	switch msg := msg.(type) {
 	case tickMsg:
 		m.textInput.Placeholder = "Enter where you're trying to go (e.g., exit.zachl.tech, zachl.tech)"
-
+	case tea.WindowSizeMsg:
+		cmd = tea.ClearScreen
+		m.width = msg.Width
+		m.viewport.Width = msg.Width
+		m.viewport.Height = msg.Height - 9
+		return m, cmd
 	case tea.KeyMsg:
 		switch msg.Type {
-		case tea.KeyCtrlC, tea.KeyEsc:
+		case tea.KeyCtrlC:
 			return m, tea.Quit
+		case tea.KeyEsc:
+			if m.showHelp {
+				m.textInput.SetValue("")
+				m.showHelp = false
+				return m, cmd
+			} else {
+				return m, cmd
+			}
 		case tea.KeyEnter:
 			m.destination = m.textInput.Value()
+			if m.destination == "help" {
+				m.showHelp = true
+				m.viewport.SetContent(m.locationCards)
+				m.viewport.GotoTop()
+				return m, cmd
+			}
 			if location, exists := m.config.Locations[m.destination]; exists {
 				m.textInput.Placeholder = fmt.Sprintf("Run this command to access %v: ssh -p %v %v\n", location.Servicename, location.Port, location.Hostname)
 				m.textInput.SetValue("")
@@ -167,30 +208,50 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.textInput.SetValue("")
 				return m, tickResponse()
 			}
+		case tea.KeyUp, tea.KeyDown:
+			if m.showHelp {
+				m.viewport, cmd = m.viewport.Update(msg)
+				return m, cmd
+			}
 		}
-	}
-	m.textInput, cmd = m.textInput.Update(msg)
-	return m, cmd
-}
-
-func getLocations(locations map[string]Location) string {
-
-	for _, location := range locations {
-
-	}
-
-}
-
-func (m Model) View() string {
-	if m.err != nil {
-		return fmt.Sprintf("Error: %v\n\n%s\n\n(esc to quit)\n\n", m.err, m.textInput.View())
 	}
 
 	if m.showHelp {
-		return getLocations(m.config.Locations)
+		viewport, cmd := m.viewport.Update(msg)
+		m.viewport = viewport
+		cmds = append(cmds, cmd)
 	}
 
-	return fmt.Sprintf("\n\n%v\n\n%v:\n\n%s\n\n(esc to quit)", m.config.Settings.Title, m.config.Settings.Description, m.textInput.View())
+	m.textInput, cmd = m.textInput.Update(msg)
+	cmds = append(cmds, cmd)
+
+	return m, tea.Batch(cmds...)
+}
+
+func getLocations(locations map[string]Location) string {
+	var builder strings.Builder
+	for _, location := range locations {
+		locationCard := fmt.Sprintf("%v\nLocation: %v\nDescription: %v\nSource: %v\n\n", location.Servicename, location.Hostname, location.Description, location.Repository)
+		builder.WriteString(locationCard)
+	}
+	return builder.String()
+}
+
+func (m Model) View() string {
+	maxWidth := m.width - 4
+
+	if m.err != nil {
+		errorMsg := fmt.Sprintf("Error: %v", m.err)
+		return lipgloss.NewStyle().PaddingLeft(2).PaddingRight(2).Render(wordwrap.String(errorMsg, maxWidth) + "\n\n" + m.textInput.View() + "\n\n(Ctrl+C to quit)\n\n")
+	}
+	if m.showHelp {
+		menu := fmt.Sprintf("Public Services (Esc to go back):\n\n%v\n\n↑/↓: Navigate • Esc: Go back", m.viewport.View())
+		return lipgloss.NewStyle().PaddingLeft(2).PaddingRight(2).PaddingTop(1).PaddingBottom(1).Render(wordwrap.String(menu, maxWidth))
+	}
+
+	mainContent := fmt.Sprintf("\n%v\n\n%v:\n\n%s\n\n(Ctrl+C to quit)", m.config.Settings.Title, m.config.Settings.Description, m.textInput.View())
+
+	return lipgloss.NewStyle().PaddingLeft(2).PaddingRight(2).Render(wordwrap.String(mainContent, maxWidth))
 }
 
 func main() {

@@ -1,9 +1,9 @@
 {
     "settings": {
-        "title": "Greetings, traveler! You've reached ZachLTech's SSH Lobby.",
-        "description": "For help on where to navigate, enter the full domain of the SSH location you're trying to access (including subdomains if applicable)",
+        "title": "Greetings, traveler! You've reached ZachLTech's SSH Lobby... But you seem to be lost",
+        "description": "For help on where to navigate, enter the full domain of the SSH location you're trying to access (type \"help\" for a list of public destinations)",
         "SSH": {
-            "enabled": true,
+            "enabled": false,
             "hostname": "0.0.0.0",
             "port": "23"
         }
@@ -11,15 +11,15 @@
     "locations": {
         "exit.zachl.tech": {
             "service": "eXit TUI Game",
-            "description": "",
-            "repo": "",
+            "description": "A terminal based recreation of the game eXit from the television series Mr. Robot",
+            "repo": "github.com/ZachLTech/eXit",
             "port": 24,
             "hostname": "exit.zachl.tech"
         },
         "zachl.tech": {
             "service": "ZachLTech's SSHfolio",
-            "description": "",
-            "repo": "",
+            "description": "My TUI based portfolio served through SSH!",
+            "repo": "github.com/ZachLTech/sshfolio",
             "port": 25,
             "hostname": "zachl.tech"
         }

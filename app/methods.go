@@ -111,7 +111,7 @@ func initialModel() Model {
 	config, err := LoadConfig("config.json")
 	width, height, _ := term.GetSize(0)
 	textInput := textinput.New()
-	textInput.Placeholder = "Enter where you're trying to go (e.g., exit.zachl.tech, zachl.tech)"
+	textInput.Placeholder = ""
 	textInput.Focus()
 
 	viewport := viewport.New(width, height-6) // Leave space for header/footer
@@ -130,7 +130,7 @@ func initialModel() Model {
 func getLocations(locations map[string]Location) string {
 	var builder strings.Builder
 	for _, location := range locations {
-		locationCard := fmt.Sprintf("%v\nLocation: %v\nDescription: %v\nSource: %v\n\n", location.Servicename, location.Hostname, location.Description, location.Repository)
+		locationCard := fmt.Sprintf("%v\nDomain: %v\nDescription: %v\nSource: %v\n\n", location.Servicename, location.Hostname, location.Description, location.Repository)
 		builder.WriteString(locationCard)
 	}
 	return builder.String()

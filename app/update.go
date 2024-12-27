@@ -14,7 +14,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tickMsg:
-		m.textInput.Placeholder = "Enter where you're trying to go (e.g., exit.zachl.tech, zachl.tech)"
+		m.textInput.Placeholder = ""
 	case tea.WindowSizeMsg:
 		cmd = tea.ClearScreen
 		m.width = msg.Width
@@ -46,7 +46,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.textInput.SetValue("")
 				return m, tickResponse()
 			} else {
-				m.textInput.Placeholder = fmt.Sprintf("no destination found at location: %s", m.destination)
+				m.textInput.Placeholder = fmt.Sprintf("Couldn't find anything running at: %s", m.destination)
 				m.textInput.SetValue("")
 				return m, tickResponse()
 			}
